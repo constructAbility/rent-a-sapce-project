@@ -1,20 +1,20 @@
+// middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
   try {
-    // Token should be sent in header as "Authorization: Bearer <token>"
-    const authHeader = req.headers["authorization"];
+    const authHeader = req.headers["authorization"] || req.headers["Authorization"];
     if (!authHeader) return res.status(401).json({ message: "No token provided" });
 
-    const token = authHeader.split(" ")[1]; // "Bearer <token>"
-    if (!token) return res.status(401).json({ message: "Invalid token format" });
+    const parts = authHeader.split(" ");
+    if (parts.length !== 2) return res.status(401).json({ message: "Invalid token format" });
 
-    // Verify token
-    const decoded = jwt.verify(token, "SECRET_KEY"); // same secret as login
-    req.user = decoded; // store decoded info in req.user
-
-    next(); // allow access to route
+    const token = parts[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
   } catch (err) {
+    console.error("Auth Middleware Error:", err.message || err);
     return res.status(401).json({ message: "Unauthorized or token expired", error: err.message });
   }
 };

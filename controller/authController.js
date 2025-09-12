@@ -1,7 +1,7 @@
 const User = require("../model/user");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const sendEmail = require("../util/mail");
+const sendEmail = require("../util/sendEmail");   
 
 // Function to generate unique ID
 function generateUniqueId(role) {
@@ -16,24 +16,12 @@ exports.register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: "Email already registered" });
 
     const hashedPass = await bcrypt.hash(password, 10);
 
-    let uniqueId;
-    let isUnique = false;
-
-    // Ensure uniqueId is not duplicate
-    while (!isUnique) {
-      uniqueId = generateUniqueId(role);
-      const exists = await User.findOne({ uniqueId });
-      if (!exists) isUnique = true;
-    }
+    const uniqueId = generateUniqueId(role); // ✅ auto generate
 
     const newUser = new User({
       uniqueId,
@@ -46,12 +34,8 @@ exports.register = async (req, res) => {
     await newUser.save();
 
     // Verification token
-    const verifyToken = jwt.sign(
-      { id: newUser._id },
-      process.env.VERIFY_SECRET || "VERIFY_SECRET",
-      { expiresIn: "1d" }
-    );
-    const verifyLink = `${process.env.BASE_URL || "https://www.google.com/webhp?authuser=1&zx=1757671857098&no_sw_cr=1"}/api/auth/verify/${verifyToken}`;
+    const verifyToken = jwt.sign({ id: newUser._id }, "VERIFY_SECRET", { expiresIn: "1d" });
+    const verifyLink = `http://localhost:5000/api/auth/verify/${verifyToken}`;
 
     await sendEmail(
       email,
@@ -61,9 +45,9 @@ exports.register = async (req, res) => {
        <a href="${verifyLink}">${verifyLink}</a>`
     );
 
-    res.status(201).json({
+    res.status(201).json({ 
       message: "Registered successfully. Please check your email to verify.",
-      uniqueId,
+      uniqueId // ✅ return generated ID
     });
   } catch (err) {
     res.status(500).json({ message: "Error in register", error: err.message });
@@ -74,24 +58,17 @@ exports.register = async (req, res) => {
 exports.verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
-    const decoded = jwt.verify(
-      token,
-      process.env.VERIFY_SECRET || "VERIFY_SECRET"
-    );
+    const decoded = jwt.verify(token, "VERIFY_SECRET");
 
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (user.isVerified) {
-      return res.json({ message: "Email already verified!" });
-    }
 
     user.isVerified = true;
     await user.save();
 
     res.json({ message: "Email verified successfully! You can now login." });
   } catch (err) {
-    res.status(400).json({ message: "Invalid or expired token" });
+    res.status(500).json({ message: "Invalid or expired token" });
   }
 };
 
@@ -100,32 +77,17 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password)
-      return res.status(400).json({ message: "All fields are required" });
-
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (!user.isVerified)
-      return res
-        .status(403)
-        .json({ message: "Please verify your email first." });
+    if (!user.isVerified) return res.status(403).json({ message: "Please verify your email first." });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET || "SECRET_KEY",
-      { expiresIn: "1d" }
-    );
+    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY", { expiresIn: "1d" });
 
-    res.json({
-      message: "Login success",
-      token,
-      role: user.role,
-      uniqueId: user.uniqueId,
-    });
+    res.json({ message: "Login success", token, role: user.role, uniqueId: user.uniqueId });
   } catch (err) {
     res.status(500).json({ message: "Error in login", error: err.message });
   }

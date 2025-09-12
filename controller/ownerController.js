@@ -1,6 +1,6 @@
 const Property = require("../model/Property");
 const cloudinary = require("../util/cloudinary");
-const sendEmail = require("../util/mail"); // email helper
+const sendEmail = require("../util/sendEmail"); // email helper
 
 
 exports.addProperty = async (req, res) => {
