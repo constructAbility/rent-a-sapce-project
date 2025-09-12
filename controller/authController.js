@@ -51,7 +51,7 @@ exports.register = async (req, res) => {
       process.env.VERIFY_SECRET || "VERIFY_SECRET",
       { expiresIn: "1d" }
     );
-    const verifyLink = `${process.env.BASE_URL || "http://localhost:5000"}/api/auth/verify/${verifyToken}`;
+    const verifyLink = `${process.env.BASE_URL || "https://www.google.com/webhp?authuser=1&zx=1757671857098&no_sw_cr=1"}/api/auth/verify/${verifyToken}`;
 
     await sendEmail(
       email,
