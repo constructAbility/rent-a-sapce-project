@@ -1,4 +1,3 @@
-// models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -15,6 +14,8 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
     isVerified: { type: Boolean, default: false },
+    otp: { type: String },               // added OTP field
+    otpExpires: { type: Date },          // added OTP expiration
   },
   { timestamps: true }
 );
