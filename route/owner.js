@@ -12,3 +12,4 @@ router.post("/add", authMiddleware, upload.array("photos", 5), ownerController.a
 router.get("/my-properties", authMiddleware, ownerController.getOwnerProperties);
 
 module.exports = router;
+

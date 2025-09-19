@@ -9,11 +9,26 @@ exports.addProperty = async (req, res) => {
     const { type, size, purpose, rentPrice, contactNumber, location, pinCode } = req.body;
 
     let photoUrls = [];
-    if (req.files) {
-      for (let file of req.files) {
-        const uploaded = await cloudinary.uploader.upload(file.path, { folder: "properties" });
+    if (req.files && req.files.photos) {
+      for (let file of req.files.photos) {
+        const uploaded = await cloudinary.uploader.upload(file.path, { folder: "properties/photos" });
         photoUrls.push(uploaded.secure_url);
       }
+    }
+
+    // 🔹 Address proof upload (optional)
+    let addressProof = {};
+    if (req.files && req.files.addressProof) {
+      const proofFile = req.files.addressProof[0];
+      const uploaded = await cloudinary.uploader.upload(proofFile.path, {
+        folder: "properties/addressProof",
+        resource_type: "auto" // pdf or image dono chalega
+      });
+
+      addressProof = {
+        url: uploaded.secure_url,
+        fileType: proofFile.mimetype.includes("pdf") ? "pdf" : "image"
+      };
     }
 
     const newProperty = new Property({
@@ -26,27 +41,10 @@ exports.addProperty = async (req, res) => {
       location,
       pinCode,
       photos: photoUrls,
+      addressProof,   // 🔹 store here
     });
 
     await newProperty.save();
-
-    // 🔹 Send email with all property details
-    await sendEmail(
-      req.user.email,
-      "Property Added",
-      `<h3>Hello ${req.user.role}</h3>
-       <p>Your property has been added successfully:</p>
-       <ul>
-         <li>Type: ${type}</li>
-         <li>Size: ${size}</li>
-         <li>Purpose: ${purpose}</li>
-         <li>Rent Price: ${rentPrice}</li>
-         <li>Contact Number: ${contactNumber}</li>
-         <li>Location: ${location}</li>
-         <li>Pin Code: ${pinCode}</li>
-         <li>Photos: ${photoUrls.join(", ")}</li>
-       </ul>`
-    );
 
     res.status(201).json({ message: "Property added successfully", property: newProperty });
   } catch (err) {
@@ -54,16 +52,28 @@ exports.addProperty = async (req, res) => {
   }
 };
 
+exports.getAllPropertiesForAdmin = async (req, res) => {
+  try {
+    // 🔹 Admin ko sab dikhega
+    const properties = await Property.find().populate("ownerId", "name email");
+    res.json({ properties });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching properties for admin", error: err.message });
+  }
+};
+
 // 🔹 Get all properties of logged-in owner
 exports.getOwnerProperties = async (req, res) => {
   try {
     const ownerId = req.user.id;
-    const properties = await Property.find({ ownerId });
+    // 🔹 Exclude addressProof
+    const properties = await Property.find({ ownerId }).select("-addressProof");
     res.json({ properties });
   } catch (err) {
     res.status(500).json({ message: "Error fetching properties", error: err.message });
   }
 };
+
 
 // 🔹 Update property by ID
 exports.updateProperty = async (req, res) => {
